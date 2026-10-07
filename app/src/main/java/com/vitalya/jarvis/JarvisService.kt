@@ -64,7 +64,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    Thread{
     try{
      val gc=GenerationConfig(sid=0,speed=0.95f,numSteps=8,extra=mapOf("lang" to "uk"))
-     val audio=nt.generateWithConfigAndCallback(text=x,config=gc,callback={ _:FloatArray -> 1 })
+     val audio=nt.generateWithConfig(text=x, config=gc)
      val samples=audio.samples
      val track=AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()).setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_FLOAT).setSampleRate(audio.sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build()).setBufferSizeInBytes(samples.size*4).setTransferMode(AudioTrack.MODE_STATIC).build()
      track.write(samples,0,samples.size,AudioTrack.WRITE_BLOCKING);track.play()
