@@ -13,10 +13,10 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val box = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(48,80,48,48) }
-        val title = TextView(this).apply { text="JARVIS 3.0"; textSize=38f }
+        val title = TextView(this).apply { text="JARVIS 4.1"; textSize=38f }
         val info = TextView(this).apply {
             text="""Скажи: «Джарвіс»
-Відповідь: «Слухаю, Віталя»
+Відповідь: «Слухаю, Віталік»
 
 Команди:
 • «Подзвони Тані»
