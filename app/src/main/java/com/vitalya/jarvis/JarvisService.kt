@@ -51,9 +51,9 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    val dir=filesDir.resolve("voice");dir.mkdirs()
    val names=listOf("duration_predictor.int8.onnx","text_encoder.int8.onnx","vector_estimator.int8.onnx","vocoder.int8.onnx","tts.json","unicode_indexer.bin","voice.bin")
    names.forEach{n->val out=dir.resolve(n);if(!out.exists())assets.open("voice/"+n).use{input->out.outputStream().use{input.copyTo(it)}}}
-   val st=OfflineTtsSupertonicModelConfig.builder().setDurationPredictor(dir.resolve(names[0]).path).setTextEncoder(dir.resolve(names[1]).path).setVectorEstimator(dir.resolve(names[2]).path).setVocoder(dir.resolve(names[3]).path).setTtsJson(dir.resolve(names[4]).path).setUnicodeIndexer(dir.resolve(names[5]).path).setVoiceStyle(dir.resolve(names[6]).path).build()
-   val model=OfflineTtsModelConfig.builder().setSupertonic(st).setNumThreads(2).setDebug(false).build()
-   neuralTts=OfflineTts(OfflineTtsConfig.builder().setModel(model).build())
+   val st=OfflineTtsSupertonicModelConfig(durationPredictor=dir.resolve(names[0]).path,textEncoder=dir.resolve(names[1]).path,vectorEstimator=dir.resolve(names[2]).path,vocoder=dir.resolve(names[3]).path,ttsJson=dir.resolve(names[4]).path,unicodeIndexer=dir.resolve(names[5]).path,voiceStyle=dir.resolve(names[6]).path)
+   val model=OfflineTtsModelConfig(supertonic=st,numThreads=2,debug=false,provider="cpu")
+   neuralTts=OfflineTts(config=OfflineTtsConfig(model=model))
   }catch(_:Throwable){neuralTts=null}
  }
  private fun say(x:String){
@@ -62,8 +62,8 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
   if(nt!=null){
    Thread{
     try{
-     val gc=GenerationConfig();gc.setSid(6);gc.setSpeed(0.95f);gc.setNumSteps(8);gc.setExtra(mapOf("lang" to "uk"))
-     val audio=nt.generateWithConfigAndCallback(x,gc,OfflineTtsCallback{1})
+     val gc=GenerationConfig(sid=0,speed=0.95f,numSteps=8,extra=mapOf("lang" to "uk"))
+     val audio=nt.generateWithConfigAndCallback(text=x,config=gc,callback={ _:FloatArray -> 1 })
      val samples=audio.samples
      val track=AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()).setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_FLOAT).setSampleRate(audio.sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build()).setBufferSizeInBytes(samples.size*4).setTransferMode(AudioTrack.MODE_STATIC).build()
      track.write(samples,0,samples.size,AudioTrack.WRITE_BLOCKING);track.play()
