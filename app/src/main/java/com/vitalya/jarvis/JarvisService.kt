@@ -22,7 +22,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  private var listening=false
  private val h=Handler(Looper.getMainLooper())
  override fun onBind(i:Intent?)=null
- override fun onCreate(){super.onCreate(); channel(); startForeground(7,note()); tts=TextToSpeech(this,this); sr=SpeechRecognizer.createSpeechRecognizer(this); sr.setRecognitionListener(this); listen()}
+ override fun onCreate(){super.onCreate(); channel(); startForeground(7,note()); tts=TextToSpeech(this,this); initNeuralTts(); sr=SpeechRecognizer.createSpeechRecognizer(this); sr.setRecognitionListener(this); listen()}
  override fun onInit(s:Int){
   if(s==TextToSpeech.SUCCESS){
    val uk=Locale("uk","UA")
@@ -41,7 +41,34 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  private fun channel(){if(Build.VERSION.SDK_INT>=26)getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("jarvis","JARVIS",NotificationManager.IMPORTANCE_LOW))}
  private fun note()=Notification.Builder(this,"jarvis").setContentTitle("JARVIS активний").setContentText("Слухаю слово «Джарвіс»").setSmallIcon(android.R.drawable.ic_btn_speak_now).build()
  private fun listen(){if(listening)return; listening=true; h.postDelayed({try{sr.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply{putExtra(RecognizerIntent.EXTRA_LANGUAGE,"uk-UA");putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)})}catch(_:Exception){listening=false;h.postDelayed({listen()},800)}},500)}
- private fun say(x:String){listening=false;try{sr.cancel()}catch(_:Exception){};tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j");h.postDelayed({listen()},2200)}
+ private fun initNeuralTts(){
+  try{
+   val a=assets
+   val cfg=OfflineTtsConfig(model=OfflineTtsModelConfig(supertonic=OfflineTtsSupertonicModelConfig(
+    durationPredictor="voice/duration_predictor.int8.onnx",
+    textEncoder="voice/text_encoder.int8.onnx",
+    vectorEstimator="voice/vector_estimator.int8.onnx",
+    vocoder="voice/vocoder.int8.onnx",
+    ttsJson="voice/tts.json",
+    voices="voice/voice.bin"
+   )), ruleFsts="", maxNumSentences=1)
+   neuralTts=OfflineTts(a,cfg)
+  }catch(_:Throwable){neuralTts=null}
+ }
+ private fun say(x:String){
+  listening=false;try{sr.cancel()}catch(_:Exception){}
+  val nt=neuralTts
+  if(nt!=null){
+   Thread{
+    try{
+     val audio=nt.generate(x,sid=0,speed=0.95f)
+     val track=AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()).setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_FLOAT).setSampleRate(audio.sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build()).setBufferSizeInBytes(audio.samples.size*4).setTransferMode(AudioTrack.MODE_STATIC).build()
+     track.write(audio.samples,0,audio.samples.size,AudioTrack.WRITE_BLOCKING);track.play()
+     Thread.sleep((audio.samples.size*1000L/audio.sampleRate)+250);track.stop();track.release();h.post{listen()}
+    }catch(_:Throwable){h.post{tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j");h.postDelayed({listen()},2200)}}
+   }.start()
+  }else{tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j");h.postDelayed({listen()},2200)}
+ }
  private fun process(raw:String){
   var s=raw.lowercase().trim()
   if(!armed&&(s.contains("джарвіс")||s.contains("джарвис"))){armed=true;s=s.replace("джарвіс","").replace("джарвис","").trim();if(s.isBlank()){say("Слухаю, Віталік");return}}
@@ -82,5 +109,5 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  override fun onResults(b:Bundle?){listening=false;b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let{process(it)};h.postDelayed({listen()},900)}
  override fun onError(e:Int){listening=false;h.postDelayed({listen()},1000)}
  override fun onReadyForSpeech(p:Bundle?){};override fun onBeginningOfSpeech(){};override fun onRmsChanged(r:Float){};override fun onBufferReceived(b:ByteArray?){};override fun onEndOfSpeech(){};override fun onPartialResults(b:Bundle?){};override fun onEvent(e:Int,p:Bundle?){}
- override fun onDestroy(){try{sr.destroy()}catch(_:Exception){};tts.shutdown();super.onDestroy()}
+ override fun onDestroy(){try{sr.destroy()}catch(_:Exception){};try{neuralTts?.release()}catch(_:Throwable){};tts.shutdown();super.onDestroy()}
 }
