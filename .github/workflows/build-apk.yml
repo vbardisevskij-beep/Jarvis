@@ -1,4 +1,5 @@
 name: Build JARVIS APK
+# rebuild: neural voice integration fix
 on:
   workflow_dispatch:
   push:
