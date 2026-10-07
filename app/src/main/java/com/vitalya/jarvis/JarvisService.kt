@@ -14,6 +14,7 @@ import android.provider.AlarmClock
 import android.provider.ContactsContract
 import android.speech.*
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import java.net.URLEncoder
 import java.util.Locale
 
@@ -25,6 +26,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  private var pendingApp:String?=null
  private var listening=false
  private var speaking=false
+ private var commandWindowUntil=0L
  private var neuralTts: OfflineTts?=null
  private val h=Handler(Looper.getMainLooper())
  override fun onBind(i:Intent?)=null
@@ -42,6 +44,12 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    // Keep consonants intelligible: masculine-leaning, not cartoonishly low.
    tts.setPitch(0.92f)
    tts.setSpeechRate(0.94f)
+   tts.setOnUtteranceProgressListener(object:UtteranceProgressListener(){
+    override fun onStart(id:String?){}
+    override fun onDone(id:String?){h.post{finishSpeaking()}}
+    @Deprecated("Deprecated in Java")
+    override fun onError(id:String?){h.post{finishSpeaking()}}
+   })
   }
  }
  private fun channel(){if(Build.VERSION.SDK_INT>=26)getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("jarvis","JARVIS",NotificationManager.IMPORTANCE_LOW))}
@@ -57,6 +65,11 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    neuralTts=OfflineTts(config=OfflineTtsConfig(model=model))
   }catch(_:Throwable){neuralTts=null}
  }
+ private fun finishSpeaking(){
+  speaking=false
+  if(armed) commandWindowUntil=SystemClock.elapsedRealtime()+7000L
+  h.postDelayed({listen()},350)
+ }
  private fun say(x:String){
   speaking=true;listening=false;try{sr.cancel()}catch(_:Exception){}
   val nt=neuralTts
@@ -68,16 +81,18 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
      val samples=audio.samples
      val track=AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()).setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_FLOAT).setSampleRate(audio.sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build()).setBufferSizeInBytes(samples.size*4).setTransferMode(AudioTrack.MODE_STATIC).build()
      track.write(samples,0,samples.size,AudioTrack.WRITE_BLOCKING);track.play()
-     Thread.sleep((samples.size*1000L/audio.sampleRate)+250);track.stop();track.release();h.post{speaking=false;listen()}
-    }catch(_:Throwable){h.post{tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j");h.postDelayed({speaking=false;listen()},2200)}}
+     Thread.sleep((samples.size*1000L/audio.sampleRate)+250);track.stop();track.release();h.post{finishSpeaking()}
+    }catch(_:Throwable){h.post{tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j-"+SystemClock.elapsedRealtime())}}
    }.start()
-  }else{tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j");h.postDelayed({speaking=false;listen()},2200)}
+  }else{tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j-"+SystemClock.elapsedRealtime())}
  }
  private fun process(raw:String){
   var s=raw.lowercase().trim()
+  if(armed && commandWindowUntil>0L && SystemClock.elapsedRealtime()>commandWindowUntil){armed=false;commandWindowUntil=0L}
   val wake=Regex("^(джарвіс|джарвис)([,.!? ]|$)")
-   if(!armed&&wake.containsMatchIn(s)){armed=true;s=wake.replaceFirst(s,"").trim();if(s.isBlank()){say("Слухаю, Віталік");return}}
+   if(!armed&&wake.containsMatchIn(s)){armed=true;commandWindowUntil=0L;s=wake.replaceFirst(s,"").trim();if(s.isBlank()){say("Слухаю, Віталік");return}}
   if(!armed)return
+  commandWindowUntil=0L
   if(pendingText!=null){
    if(s.contains("відправ")||s.contains("отправ")||s=="так"){share();return}
    if(s.contains("скасуй")||s.contains("отмена")||s=="ні"){pendingText=null;pendingApp=null;say("Скасував");return}
