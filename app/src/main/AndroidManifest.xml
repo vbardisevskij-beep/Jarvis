@@ -17,7 +17,7 @@
         <package android:name="com.openai.chatgpt"/>
         <package android:name="com.google.android.youtube"/>
     </queries>
-    <application android:theme="@style/Theme.Jarvis" android:label="JARVIS" android:allowBackup="true">
+    <application android:theme="@style/Theme.Jarvis" android:label="JARVIS" android:allowBackup="false" android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
