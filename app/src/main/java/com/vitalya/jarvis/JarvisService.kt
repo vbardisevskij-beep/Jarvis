@@ -28,6 +28,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  private var speaking=false
  private var commandWindowUntil=0L
  private var neuralTts: OfflineTts?=null
+ private var restartToken:Runnable?=null
  private val h=Handler(Looper.getMainLooper())
  override fun onBind(i:Intent?)=null
  override fun onCreate(){super.onCreate(); channel(); startForeground(7,note()); tts=TextToSpeech(this,this); initNeuralTts(); sr=SpeechRecognizer.createSpeechRecognizer(this); sr.setRecognitionListener(this); listen()}
@@ -54,12 +55,25 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  }
  private fun channel(){if(Build.VERSION.SDK_INT>=26)getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("jarvis","JARVIS",NotificationManager.IMPORTANCE_LOW))}
  private fun note()=Notification.Builder(this,"jarvis").setContentTitle("JARVIS активний").setContentText("Слухаю слово «Джарвіс»").setSmallIcon(android.R.drawable.ic_btn_speak_now).build()
- private fun listen(){if(listening||speaking)return; listening=true; h.postDelayed({try{sr.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply{putExtra(RecognizerIntent.EXTRA_LANGUAGE,"uk-UA");putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-     putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE,true)
-     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS,false)
-     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,3000L)
-     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,2200L)
-     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,1200L)})}catch(_:Exception){listening=false;h.postDelayed({listen()},800)}},500)}
+ private fun scheduleListen(delay:Long=1200L){
+  restartToken?.let{h.removeCallbacks(it)}
+  val r=Runnable{restartToken=null;listen()};restartToken=r;h.postDelayed(r,delay)
+ }
+ private fun listen(){
+  if(listening||speaking)return
+  listening=true
+  try{
+   sr.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply{
+    putExtra(RecognizerIntent.EXTRA_LANGUAGE,"uk-UA")
+    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE,true)
+    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS,false)
+    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,5000L)
+    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,3500L)
+    putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,1500L)
+   })
+  }catch(_:Exception){listening=false;scheduleListen(5000L)}
+ }
  private fun initNeuralTts(){
   try{
    val dir=filesDir.resolve("voice");dir.mkdirs()
@@ -73,7 +87,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  private fun finishSpeaking(){
   speaking=false
   if(armed) commandWindowUntil=SystemClock.elapsedRealtime()+7000L
-  h.postDelayed({listen()},350)
+  scheduleListen(500L)
  }
  private fun say(x:String){
   speaking=true
@@ -105,7 +119,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    s.contains("чатгпт")||s.contains("chatgpt")->launch("com.openai.chatgpt")
    s.contains("ютуб")||s.contains("youtube")->{say("Та вже відкриваю YouTube");h.postDelayed({launch("com.google.android.youtube")},650)}
    s.contains("відкрий")||s.contains("открой")||s.contains("включи")||s.contains("увімкни")->openApp(s.replace("відкрий","").replace("открой","").replace("включи","").replace("увімкни","").trim())
-   else->{armed=false;listen()}
+   else->{armed=false;scheduleListen(1500L)}
   }
  }
  private fun call(name:String){
@@ -131,17 +145,17 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
   val conf=b?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)?.firstOrNull() ?: -1f
   // In standby, ignore weak guesses from room noise. Commands after wake word remain responsive.
   if(text!=null && (armed || conf<0f || conf>=0.62f)) process(text)
-  if(!speaking)h.postDelayed({listen()},2200)
+  if(!speaking)scheduleListen(if(armed) 500L else 4500L)
  }
  override fun onError(e:Int){
   listening=false
   if(!speaking){
    val delay=when(e){
-    SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> 3500L
-    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 2500L
-    else -> 1800L
+    SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> 6000L
+    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 5000L
+    else -> 4000L
    }
-   h.postDelayed({listen()},delay)
+   scheduleListen(delay)
   }
  }
  override fun onReadyForSpeech(p:Bundle?){};override fun onBeginningOfSpeech(){};override fun onRmsChanged(r:Float){};override fun onBufferReceived(b:ByteArray?){};override fun onEndOfSpeech(){};override fun onPartialResults(b:Bundle?){};override fun onEvent(e:Int,p:Bundle?){}
