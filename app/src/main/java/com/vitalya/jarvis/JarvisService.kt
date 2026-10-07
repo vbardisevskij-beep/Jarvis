@@ -30,8 +30,8 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
     n.contains("male") || n.contains("man") || n.contains("mascul") || n.contains("чолов")
    }
    if(male!=null) tts.voice=male
-   tts.setPitch(0.72f)
-   tts.setSpeechRate(0.92f)
+   tts.setPitch(0.82f)
+   tts.setSpeechRate(0.88f)
   }
  }
  private fun channel(){if(Build.VERSION.SDK_INT>=26)getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("jarvis","JARVIS",NotificationManager.IMPORTANCE_LOW))}
@@ -54,7 +54,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    s.contains("таймер")->timer(s)
    s.contains("будильник")->alarm(s)
    s.contains("чатгпт")||s.contains("chatgpt")->launch("com.openai.chatgpt")
-   s.contains("ютуб")||s.contains("youtube")->launch("com.google.android.youtube")\n   s.contains("відкрий")||s.contains("открой")||s.contains("включи")||s.contains("увімкни")->openApp(s.replace("відкрий","").replace("открой","").replace("включи","").replace("увімкни","").trim())
+   s.contains("ютуб")||s.contains("youtube")->{say("Відкриваю YouTube");h.postDelayed({launch("com.google.android.youtube")},650)}\n   s.contains("відкрий")||s.contains("открой")||s.contains("включи")||s.contains("увімкни")->openApp(s.replace("відкрий","").replace("открой","").replace("включи","").replace("увімкни","").trim())
    else->say("Не розібрав команду. Скажи ще раз, Віталік.")
   }
  }
