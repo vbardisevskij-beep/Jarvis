@@ -4,6 +4,10 @@ import android.app.*
 import android.content.*
 import android.database.Cursor
 import android.hardware.camera2.CameraManager
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
+import com.k2fsa.sherpa.onnx.*
 import android.net.Uri
 import android.os.*
 import android.provider.AlarmClock
@@ -20,6 +24,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  private var pendingText:String?=null
  private var pendingApp:String?=null
  private var listening=false
+ private var neuralTts: OfflineTts?=null
  private val h=Handler(Looper.getMainLooper())
  override fun onBind(i:Intent?)=null
  override fun onCreate(){super.onCreate(); channel(); startForeground(7,note()); tts=TextToSpeech(this,this); initNeuralTts(); sr=SpeechRecognizer.createSpeechRecognizer(this); sr.setRecognitionListener(this); listen()}
@@ -43,16 +48,12 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  private fun listen(){if(listening)return; listening=true; h.postDelayed({try{sr.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply{putExtra(RecognizerIntent.EXTRA_LANGUAGE,"uk-UA");putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)})}catch(_:Exception){listening=false;h.postDelayed({listen()},800)}},500)}
  private fun initNeuralTts(){
   try{
-   val a=assets
-   val cfg=OfflineTtsConfig(model=OfflineTtsModelConfig(supertonic=OfflineTtsSupertonicModelConfig(
-    durationPredictor="voice/duration_predictor.int8.onnx",
-    textEncoder="voice/text_encoder.int8.onnx",
-    vectorEstimator="voice/vector_estimator.int8.onnx",
-    vocoder="voice/vocoder.int8.onnx",
-    ttsJson="voice/tts.json",
-    voices="voice/voice.bin"
-   )), ruleFsts="", maxNumSentences=1)
-   neuralTts=OfflineTts(a,cfg)
+   val dir=filesDir.resolve("voice");dir.mkdirs()
+   val names=listOf("duration_predictor.int8.onnx","text_encoder.int8.onnx","vector_estimator.int8.onnx","vocoder.int8.onnx","tts.json","unicode_indexer.bin","voice.bin")
+   names.forEach{n->val out=dir.resolve(n);if(!out.exists())assets.open("voice/"+n).use{input->out.outputStream().use{input.copyTo(it)}}}
+   val st=OfflineTtsSupertonicModelConfig.builder().setDurationPredictor(dir.resolve(names[0]).path).setTextEncoder(dir.resolve(names[1]).path).setVectorEstimator(dir.resolve(names[2]).path).setVocoder(dir.resolve(names[3]).path).setTtsJson(dir.resolve(names[4]).path).setUnicodeIndexer(dir.resolve(names[5]).path).setVoiceStyle(dir.resolve(names[6]).path).build()
+   val model=OfflineTtsModelConfig.builder().setSupertonic(st).setNumThreads(2).setDebug(false).build()
+   neuralTts=OfflineTts(OfflineTtsConfig.builder().setModel(model).build())
   }catch(_:Throwable){neuralTts=null}
  }
  private fun say(x:String){
@@ -61,10 +62,12 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
   if(nt!=null){
    Thread{
     try{
-     val audio=nt.generate(x,sid=0,speed=0.95f)
-     val track=AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()).setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_FLOAT).setSampleRate(audio.sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build()).setBufferSizeInBytes(audio.samples.size*4).setTransferMode(AudioTrack.MODE_STATIC).build()
-     track.write(audio.samples,0,audio.samples.size,AudioTrack.WRITE_BLOCKING);track.play()
-     Thread.sleep((audio.samples.size*1000L/audio.sampleRate)+250);track.stop();track.release();h.post{listen()}
+     val gc=GenerationConfig();gc.setSid(6);gc.setSpeed(0.95f);gc.setNumSteps(8);gc.setExtra(mapOf("lang" to "uk"))
+     val audio=nt.generateWithConfigAndCallback(x,gc,OfflineTtsCallback{1})
+     val samples=audio.samples
+     val track=AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()).setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_FLOAT).setSampleRate(audio.sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build()).setBufferSizeInBytes(samples.size*4).setTransferMode(AudioTrack.MODE_STATIC).build()
+     track.write(samples,0,samples.size,AudioTrack.WRITE_BLOCKING);track.play()
+     Thread.sleep((samples.size*1000L/audio.sampleRate)+250);track.stop();track.release();h.post{listen()}
     }catch(_:Throwable){h.post{tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j");h.postDelayed({listen()},2200)}}
    }.start()
   }else{tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j");h.postDelayed({listen()},2200)}
