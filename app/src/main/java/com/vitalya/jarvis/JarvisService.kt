@@ -71,20 +71,13 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
   h.postDelayed({listen()},350)
  }
  private fun say(x:String){
-  speaking=true;listening=false;try{sr.cancel()}catch(_:Exception){}
-  val nt=neuralTts
-  if(nt!=null){
-   Thread{
-    try{
-     val gc=GenerationConfig(sid=0,speed=0.95f,numSteps=8,extra=mapOf("lang" to "uk"))
-     val audio=nt.generateWithConfig(text=x, config=gc)
-     val samples=audio.samples
-     val track=AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()).setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_FLOAT).setSampleRate(audio.sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build()).setBufferSizeInBytes(samples.size*4).setTransferMode(AudioTrack.MODE_STATIC).build()
-     track.write(samples,0,samples.size,AudioTrack.WRITE_BLOCKING);track.play()
-     Thread.sleep((samples.size*1000L/audio.sampleRate)+250);track.stop();track.release();h.post{finishSpeaking()}
-    }catch(_:Throwable){h.post{tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j-"+SystemClock.elapsedRealtime())}}
-   }.start()
-  }else{tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j-"+SystemClock.elapsedRealtime())}
+  speaking=true
+  listening=false
+  try{sr.cancel()}catch(_:Exception){}
+  h.postDelayed({
+   val result=tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"jarvis-"+SystemClock.elapsedRealtime())
+   if(result==TextToSpeech.ERROR) finishSpeaking()
+  },250)
  }
  private fun process(raw:String){
   var s=raw.lowercase().trim()
