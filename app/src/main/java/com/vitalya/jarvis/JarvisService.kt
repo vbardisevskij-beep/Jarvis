@@ -75,7 +75,8 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  }
  private fun process(raw:String){
   var s=raw.lowercase().trim()
-  if(!armed&&(s.contains("джарвіс")||s.contains("джарвис"))){armed=true;s=s.replace("джарвіс","").replace("джарвис","").trim();if(s.isBlank()){say("Слухаю, Віталік");return}}
+  val wake=Regex("^(джарвіс|джарвис)([,.!? ]|$)")
+   if(!armed&&wake.containsMatchIn(s)){armed=true;s=wake.replaceFirst(s,"").trim();if(s.isBlank()){say("Слухаю, Віталік");return}}
   if(!armed)return
   if(pendingText!=null){
    if(s.contains("відправ")||s.contains("отправ")||s=="так"){share();return}
@@ -91,7 +92,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    s.contains("чатгпт")||s.contains("chatgpt")->launch("com.openai.chatgpt")
    s.contains("ютуб")||s.contains("youtube")->{say("Відкриваю YouTube");h.postDelayed({launch("com.google.android.youtube")},650)}
    s.contains("відкрий")||s.contains("открой")||s.contains("включи")||s.contains("увімкни")->openApp(s.replace("відкрий","").replace("открой","").replace("включи","").replace("увімкни","").trim())
-   else->{armed=false;say(listOf("Не розібрав команду. Скажи ще раз, Віталік.","Бляха, не розчув. Поклич мене ще раз.","От зараза, не зрозумів. Скажи: Джарвіс, і команду.").random())}
+   else->{armed=false;listen()}
   }
  }
  private fun call(name:String){
