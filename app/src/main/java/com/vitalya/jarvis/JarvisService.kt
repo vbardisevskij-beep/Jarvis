@@ -22,7 +22,18 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  private val h=Handler(Looper.getMainLooper())
  override fun onBind(i:Intent?)=null
  override fun onCreate(){super.onCreate(); channel(); startForeground(7,note()); tts=TextToSpeech(this,this); sr=SpeechRecognizer.createSpeechRecognizer(this); sr.setRecognitionListener(this); listen()}
- override fun onInit(s:Int){if(s==TextToSpeech.SUCCESS)tts.language=Locale("uk","UA")}
+ override fun onInit(s:Int){
+  if(s==TextToSpeech.SUCCESS){
+   tts.language=Locale("uk","UA")
+   val male=tts.voices?.filter{it.locale.language=="uk" || it.locale.language=="ru"}?.firstOrNull{
+    val n=it.name.lowercase()
+    n.contains("male") || n.contains("man") || n.contains("mascul") || n.contains("чолов")
+   }
+   if(male!=null) tts.voice=male
+   tts.setPitch(0.72f)
+   tts.setSpeechRate(0.92f)
+  }
+ }
  private fun channel(){if(Build.VERSION.SDK_INT>=26)getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("jarvis","JARVIS",NotificationManager.IMPORTANCE_LOW))}
  private fun note()=Notification.Builder(this,"jarvis").setContentTitle("JARVIS активний").setContentText("Слухаю слово «Джарвіс»").setSmallIcon(android.R.drawable.ic_btn_speak_now).build()
  private fun listen(){if(listening)return; listening=true; h.postDelayed({try{sr.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply{putExtra(RecognizerIntent.EXTRA_LANGUAGE,"uk-UA");putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)})}catch(_:Exception){listening=false;h.postDelayed({listen()},800)}},500)}
