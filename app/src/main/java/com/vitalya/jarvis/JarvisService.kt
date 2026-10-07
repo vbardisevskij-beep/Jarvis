@@ -29,7 +29,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  private fun say(x:String){listening=false;try{sr.cancel()}catch(_:Exception){};tts.speak(x,TextToSpeech.QUEUE_FLUSH,null,"j");h.postDelayed({listen()},2200)}
  private fun process(raw:String){
   var s=raw.lowercase().trim()
-  if(!armed&&(s.contains("джарвіс")||s.contains("джарвис"))){armed=true;s=s.replace("джарвіс","").replace("джарвис","").trim();if(s.isBlank()){say("Слухаю, Віталя");return}}
+  if(!armed&&(s.contains("джарвіс")||s.contains("джарвис"))){armed=true;s=s.replace("джарвіс","").replace("джарвис","").trim();if(s.isBlank()){say("Слухаю, Віталік");return}}
   if(!armed)return
   if(pendingText!=null){
    if(s.contains("відправ")||s.contains("отправ")||s=="так"){share();return}
@@ -44,7 +44,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    s.contains("будильник")->alarm(s)
    s.contains("чатгпт")||s.contains("chatgpt")->launch("com.openai.chatgpt")
    s.contains("ютуб")||s.contains("youtube")->launch("com.google.android.youtube")\n   s.contains("відкрий")||s.contains("открой")||s.contains("включи")||s.contains("увімкни")->openApp(s.replace("відкрий","").replace("открой","").replace("включи","").replace("увімкни","").trim())
-   else->say("Не розібрав команду. Скажи ще раз, Віталя.")
+   else->say("Не розібрав команду. Скажи ще раз, Віталік.")
   }
  }
  private fun call(name:String){
