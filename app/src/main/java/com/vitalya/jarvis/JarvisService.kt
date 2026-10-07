@@ -42,8 +42,8 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    }
    if(male!=null) tts.voice=male
    // Keep consonants intelligible: masculine-leaning, not cartoonishly low.
-   tts.setPitch(0.92f)
-   tts.setSpeechRate(0.94f)
+   tts.setPitch(0.78f)
+   tts.setSpeechRate(0.92f)
    tts.setOnUtteranceProgressListener(object:UtteranceProgressListener(){
     override fun onStart(id:String?){}
     override fun onDone(id:String?){h.post{finishSpeaking()}}
@@ -54,7 +54,12 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  }
  private fun channel(){if(Build.VERSION.SDK_INT>=26)getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("jarvis","JARVIS",NotificationManager.IMPORTANCE_LOW))}
  private fun note()=Notification.Builder(this,"jarvis").setContentTitle("JARVIS активний").setContentText("Слухаю слово «Джарвіс»").setSmallIcon(android.R.drawable.ic_btn_speak_now).build()
- private fun listen(){if(listening||speaking)return; listening=true; h.postDelayed({try{sr.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply{putExtra(RecognizerIntent.EXTRA_LANGUAGE,"uk-UA");putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)})}catch(_:Exception){listening=false;h.postDelayed({listen()},800)}},500)}
+ private fun listen(){if(listening||speaking)return; listening=true; h.postDelayed({try{sr.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply{putExtra(RecognizerIntent.EXTRA_LANGUAGE,"uk-UA");putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+     putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE,true)
+     putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS,false)
+     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,3000L)
+     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,2200L)
+     putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,1200L)})}catch(_:Exception){listening=false;h.postDelayed({listen()},800)}},500)}
  private fun initNeuralTts(){
   try{
    val dir=filesDir.resolve("voice");dir.mkdirs()
@@ -98,7 +103,7 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    s.contains("таймер")->timer(s)
    s.contains("будильник")->alarm(s)
    s.contains("чатгпт")||s.contains("chatgpt")->launch("com.openai.chatgpt")
-   s.contains("ютуб")||s.contains("youtube")->{say("Відкриваю YouTube");h.postDelayed({launch("com.google.android.youtube")},650)}
+   s.contains("ютуб")||s.contains("youtube")->{say("Та вже відкриваю YouTube");h.postDelayed({launch("com.google.android.youtube")},650)}
    s.contains("відкрий")||s.contains("открой")||s.contains("включи")||s.contains("увімкни")->openApp(s.replace("відкрий","").replace("открой","").replace("включи","").replace("увімкни","").trim())
    else->{armed=false;listen()}
   }
@@ -119,8 +124,26 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  private fun num(s:String)=Regex("\\d+").find(s)?.value?.toIntOrNull()
  private fun timer(s:String){val n=num(s)?:return say("На скільки хвилин?");val sec=if(s.contains("год"))n*3600 else n*60;startActivity(Intent(AlarmClock.ACTION_SET_TIMER).putExtra(AlarmClock.EXTRA_LENGTH,sec).putExtra(AlarmClock.EXTRA_SKIP_UI,true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));say("Таймер поставив")}
  private fun alarm(s:String){val m=Regex("(\\d{1,2})[:.](\\d{2})").find(s);val hr=m?.groupValues?.get(1)?.toIntOrNull()?:num(s)?:return say("Скажи час");val mn=m?.groupValues?.get(2)?.toIntOrNull()?:0;startActivity(Intent(AlarmClock.ACTION_SET_ALARM).putExtra(AlarmClock.EXTRA_HOUR,hr).putExtra(AlarmClock.EXTRA_MINUTES,mn).putExtra(AlarmClock.EXTRA_SKIP_UI,true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));say("Будильник поставив")}
- override fun onResults(b:Bundle?){listening=false;b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let{process(it)};if(!speaking)h.postDelayed({listen()},900)}
- override fun onError(e:Int){listening=false;if(!speaking)h.postDelayed({listen()},1000)}
+ override fun onResults(b:Bundle?){
+  listening=false
+  val results=b?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+  val text=results?.firstOrNull()
+  val conf=b?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)?.firstOrNull() ?: -1f
+  // In standby, ignore weak guesses from room noise. Commands after wake word remain responsive.
+  if(text!=null && (armed || conf<0f || conf>=0.62f)) process(text)
+  if(!speaking)h.postDelayed({listen()},2200)
+ }
+ override fun onError(e:Int){
+  listening=false
+  if(!speaking){
+   val delay=when(e){
+    SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> 3500L
+    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 2500L
+    else -> 1800L
+   }
+   h.postDelayed({listen()},delay)
+  }
+ }
  override fun onReadyForSpeech(p:Bundle?){};override fun onBeginningOfSpeech(){};override fun onRmsChanged(r:Float){};override fun onBufferReceived(b:ByteArray?){};override fun onEndOfSpeech(){};override fun onPartialResults(b:Bundle?){};override fun onEvent(e:Int,p:Bundle?){}
  override fun onDestroy(){try{sr.destroy()}catch(_:Exception){};try{neuralTts?.release()}catch(_:Throwable){};tts.shutdown();super.onDestroy()}
 }
