@@ -21,3 +21,8 @@ android {
         jvmTarget = "17"
     }
 }
+
+
+dependencies {
+    implementation("com.k2fsa.sherpa.onnx:sherpa-onnx:1.12.20")
+}
