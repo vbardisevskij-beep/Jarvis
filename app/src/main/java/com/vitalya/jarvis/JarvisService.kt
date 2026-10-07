@@ -18,20 +18,24 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
  private lateinit var tts: TextToSpeech
  private var armed=false
  private var pendingText:String?=null
- private var pendingApp:String?=null\n private var listening=false
+ private var pendingApp:String?=null
+ private var listening=false
  private val h=Handler(Looper.getMainLooper())
  override fun onBind(i:Intent?)=null
  override fun onCreate(){super.onCreate(); channel(); startForeground(7,note()); tts=TextToSpeech(this,this); sr=SpeechRecognizer.createSpeechRecognizer(this); sr.setRecognitionListener(this); listen()}
  override fun onInit(s:Int){
   if(s==TextToSpeech.SUCCESS){
-   tts.language=Locale("uk","UA")
-   val male=tts.voices?.filter{it.locale.language=="uk" || it.locale.language=="ru"}?.firstOrNull{
+   val uk=Locale("uk","UA")
+   tts.language=uk
+   val candidates=tts.voices?.filter{ it.locale.language=="uk" || it.locale.language=="ru" }.orEmpty()
+   val male=candidates.firstOrNull{
     val n=it.name.lowercase()
-    n.contains("male") || n.contains("man") || n.contains("mascul") || n.contains("чолов")
+    n.contains("male") || n.contains("mascul") || n.contains("чолов")
    }
    if(male!=null) tts.voice=male
-   tts.setPitch(0.82f)
-   tts.setSpeechRate(0.88f)
+   // Keep consonants intelligible: masculine-leaning, not cartoonishly low.
+   tts.setPitch(0.86f)
+   tts.setSpeechRate(0.90f)
   }
  }
  private fun channel(){if(Build.VERSION.SDK_INT>=26)getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("jarvis","JARVIS",NotificationManager.IMPORTANCE_LOW))}
@@ -54,8 +58,9 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    s.contains("таймер")->timer(s)
    s.contains("будильник")->alarm(s)
    s.contains("чатгпт")||s.contains("chatgpt")->launch("com.openai.chatgpt")
-   s.contains("ютуб")||s.contains("youtube")->{say("Відкриваю YouTube");h.postDelayed({launch("com.google.android.youtube")},650)}\n   s.contains("відкрий")||s.contains("открой")||s.contains("включи")||s.contains("увімкни")->openApp(s.replace("відкрий","").replace("открой","").replace("включи","").replace("увімкни","").trim())
-   else->say("Не розібрав команду. Скажи ще раз, Віталік.")
+   s.contains("ютуб")||s.contains("youtube")->{say("Відкриваю YouTube");h.postDelayed({launch("com.google.android.youtube")},650)}
+   s.contains("відкрий")||s.contains("открой")||s.contains("включи")||s.contains("увімкни")->openApp(s.replace("відкрий","").replace("открой","").replace("включи","").replace("увімкни","").trim())
+   else->{armed=false;say(listOf("Не розібрав команду. Скажи ще раз, Віталік.","Бляха, не розчув. Поклич мене ще раз.","От зараза, не зрозумів. Скажи: Джарвіс, і команду.").random())}
   }
  }
  private fun call(name:String){
