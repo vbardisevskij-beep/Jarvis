@@ -34,8 +34,8 @@ class JarvisService : Service(), RecognitionListener, TextToSpeech.OnInitListene
    }
    if(male!=null) tts.voice=male
    // Keep consonants intelligible: masculine-leaning, not cartoonishly low.
-   tts.setPitch(0.86f)
-   tts.setSpeechRate(0.90f)
+   tts.setPitch(0.92f)
+   tts.setSpeechRate(0.94f)
   }
  }
  private fun channel(){if(Build.VERSION.SDK_INT>=26)getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel("jarvis","JARVIS",NotificationManager.IMPORTANCE_LOW))}
