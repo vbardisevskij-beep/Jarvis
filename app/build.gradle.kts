@@ -23,3 +23,8 @@ android {
 }
 
 
+
+
+dependencies {
+    implementation(files("libs/sherpa-onnx-1.13.8.aar"))
+}
