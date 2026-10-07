@@ -2,14 +2,14 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 
 android {
     namespace = "com.vitalya.jarvis"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.vitalya.jarvis"
         minSdk = 29
-        targetSdk = 35
-        versionCode = 4
-        versionName = "4.0"
+        targetSdk = 36
+        versionCode = 5
+        versionName = "4.1"
     }
 
     compileOptions {
