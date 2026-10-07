@@ -15,6 +15,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Download Ukrainian neural voice
+        run: |
+          mkdir -p app/src/main/assets/voice
+          curl -L --fail --retry 3 -o /tmp/voice.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2
+          tar -xjf /tmp/voice.tar.bz2 -C app/src/main/assets/voice --strip-components=1
+          rm -f /tmp/voice.tar.bz2
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
